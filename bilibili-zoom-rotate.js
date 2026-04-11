@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         B站视频增强：滑条缩放、旋转、拖拽
-// @version      4.0.0
+// @version      5.0.0
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/list/watchlater/*
-// @match        https://www.bilibili.com/bangumi/play/*
+// @match        https://www.bilibili.com/medialist/play/*
 // @icon         https://www.bilibili.com/favicon.ico
 // @grant        GM_addStyle
 // @grant        GM_setValue
@@ -47,6 +47,9 @@
     .nbs-control-root {
       position: relative;
       user-select: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .nbs-control-root .nbs-toggle-btn {
@@ -56,6 +59,19 @@
       width: 28px;
       height: 28px;
       cursor: pointer;
+      margin: 0 auto;
+      transition: transform 0.2s ease, width 0.2s ease, height 0.2s ease;
+    }
+
+    /* 非全屏模式下的紧凑样式 */
+    .nbs-control-root.nbs-compact-mode .nbs-toggle-btn {
+      width: 24px;
+      height: 24px;
+      transform: scale(0.85);
+    }
+    .nbs-control-root.nbs-compact-mode .nbs-toggle-btn svg {
+      width: 16px;
+      height: 16px;
     }
 
     .nbs-control-root .nbs-panel {
@@ -164,36 +180,46 @@
       margin-top: 4px;
     }
 
-    /* 独立还原按钮 - 美化样式，跟随鼠标显隐 */
+    /* 独立还原按钮 - 美化样式，跟随鼠标显隐，响应式缩放 */
     .nbs-reset-btn-global {
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
-      bottom: 15%;
       display: flex;
       align-items: center;
       justify-content: center;
       height: 36px;
       padding: 0 20px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 36px;
       font-size: 16px;
       font-weight: 600;
       letter-spacing: 0.5px;
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-      color: #fff;
+      color: #FB7299;
       cursor: pointer;
-      background: rgba(251, 114, 153, 0.85);
-      backdrop-filter: blur(4px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
       z-index: 22;
       white-space: nowrap;
       transition: all 0.2s ease;
     }
     .nbs-reset-btn-global:hover {
-      background: rgba(251, 114, 153, 1);
-      transform: translateX(-50%) scale(1.05);
+      background: rgba(0, 0, 0, 0.9);
+      color: #ff85a7;
+      transform: translateX(-50%) scale(1.02);
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    }
+    /* 非全屏紧凑模式缩小还原按钮 */
+    .nbs-reset-btn-global.nbs-compact {
+      transform: translateX(-50%) scale(0.85);
+      font-size: 14px;
+      height: 30px;
+      padding: 0 16px;
+    }
+    .nbs-reset-btn-global.nbs-compact:hover {
+      transform: translateX(-50%) scale(0.87);
     }
     /* 鼠标静止3秒后隐藏按钮 */
     .nbs-reset-btn-global.hide {
@@ -201,7 +227,7 @@
       pointer-events: none;
     }
 
-    /* Toast 提示 - 顶部居中，美化样式 */
+    /* Toast 提示 - 顶部居中，美化样式，响应式缩放 */
     .nbs-toast {
       position: absolute;
       top: 15%;
@@ -222,6 +248,12 @@
       transition: opacity 0.2s ease;
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+    /* 非全屏紧凑模式缩小Toast */
+    .nbs-toast.nbs-compact {
+      transform: translateX(-50%) scale(0.85);
+      font-size: 14px;
+      padding: 10px 24px;
     }
     .nbs-toast.show {
       opacity: 1;
@@ -334,7 +366,15 @@
   }
 
   function updateResetButtonPosition() {
-    // 位置由CSS bottom:15% 决定，无需额外调整
+    if (!refs.resetButton) return;
+    const container = getPlayerContainer();
+    if (!container) return;
+    const screenMode = container.dataset.screen || 'normal';
+    if (screenMode === 'full' || screenMode === 'web') {
+      refs.resetButton.style.bottom = '15%';
+    } else {
+      refs.resetButton.style.bottom = '80px';
+    }
   }
 
   function updatePanelPosition() {
@@ -496,6 +536,51 @@
     }
   }
 
+  // 根据播放器模式更新所有元素的紧凑类
+  function updateCompactMode() {
+    const container = getPlayerContainer();
+    const screenMode = container ? container.dataset.screen : 'normal';
+    const isCompact = (screenMode !== 'full' && screenMode !== 'web');
+    // 控制面板根元素
+    if (refs.root) {
+      if (isCompact) {
+        refs.root.classList.add('nbs-compact-mode');
+      } else {
+        refs.root.classList.remove('nbs-compact-mode');
+      }
+    }
+    // 还原按钮
+    if (refs.resetButton) {
+      if (isCompact) {
+        refs.resetButton.classList.add('nbs-compact');
+      } else {
+        refs.resetButton.classList.remove('nbs-compact');
+      }
+      updateResetButtonPosition(); // 同时更新位置
+    }
+    // Toast
+    if (refs.toast) {
+      if (isCompact) {
+        refs.toast.classList.add('nbs-compact');
+      } else {
+        refs.toast.classList.remove('nbs-compact');
+      }
+    }
+  }
+
+  // 监听播放器模式变化
+  function initScreenModeObserver() {
+    const container = getPlayerContainer();
+    if (!container) return;
+    const modeObserver = new MutationObserver(() => {
+      updateCompactMode();
+      updatePanelPosition();
+      updateResetButtonPosition();
+    });
+    modeObserver.observe(container, { attributes: true, attributeFilter: ['data-screen'] });
+    updateCompactMode();
+  }
+
   // 监听播放器容器鼠标移动，控制还原按钮显隐
   function initResetButtonMouseIdle() {
     if (!playerContainer) return;
@@ -504,10 +589,8 @@
 
     const resetIdle = () => {
       if (mouseIdleTimer) clearTimeout(mouseIdleTimer);
-      // 移除隐藏类（显示按钮）
       resetBtn.classList.remove('hide');
       mouseIdleTimer = setTimeout(() => {
-        // 3秒无移动，添加隐藏类
         if (resetBtn && !resetBtn.matches(':hover')) {
           resetBtn.classList.add('hide');
         }
@@ -515,16 +598,14 @@
     };
 
     playerContainer.addEventListener('mousemove', resetIdle);
-    // 初始显示
-    resetIdle();
-    // 清理函数将在重新挂载时处理，但这里简单起见，不重复添加
+    resetIdle(); // 初始显示
   }
 
   // 更新提示文本
   function updateShortcutTip() {
     if (!refs.tipText) return;
     const dragMod = getModifierDisplayName(userConfig.dragModifierKey);
-    refs.tipText.innerHTML = `拖拽移动：${dragMod} + 鼠标左键<br>缩放范围：50% - 250% | 精细旋转滑条`;
+    refs.tipText.innerHTML = `拖拽移动：${dragMod}`;
   }
 
   // 挂载全局重置按钮
@@ -548,6 +629,7 @@
     container.appendChild(btn);
     refs.resetButton = btn;
     updateResetButtonVisibility();
+    updateCompactMode();      // 确保紧凑样式
     initResetButtonMouseIdle(); // 启动鼠标空闲检测
   }
 
@@ -559,6 +641,7 @@
     toast.className = 'nbs-toast';
     container.appendChild(toast);
     refs.toast = toast;
+    updateCompactMode(); // 应用紧凑样式
   }
 
   function bindVideoWrap() {
@@ -589,6 +672,7 @@
     if (refs.root && refs.root.isConnected) {
       refs.tipText = refs.root.querySelector('.nbs-tip');
       if (refs.tipText) updateShortcutTip();
+      updateCompactMode(); // 确保模式类同步
       return;
     }
 
@@ -672,6 +756,7 @@
     updatePanelPosition();
     updateScaleUI();
     updateRotateUI();
+    updateCompactMode(); // 应用初始紧凑模式
   }
 
   function sync() {
@@ -682,6 +767,7 @@
     updatePanelPosition();
     updateResetButtonPosition();
     applyTransform();
+    initScreenModeObserver(); // 监听全屏切换
   }
 
   function scheduleSync() {
@@ -707,7 +793,6 @@
     document.addEventListener('keydown', onKeydown, true);
     document.addEventListener('mousemove', onMouseMove, true);
     document.addEventListener('mouseup', onMouseUp, true);
-    // 捕获阶段拦截点击
     document.addEventListener('click', onCaptureClick, true);
     window.addEventListener('resize', () => {
       updatePanelPosition();
