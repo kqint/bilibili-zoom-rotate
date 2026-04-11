@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         B站视频增强：滑条缩放、旋转、拖拽
-// @version      5.0.0
+// @version      6.0.0
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @match        https://www.bilibili.com/video/*
@@ -56,22 +56,21 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
+      width: 100%;
+      height: 100%;
       cursor: pointer;
-      margin: 0 auto;
-      transition: transform 0.2s ease, width 0.2s ease, height 0.2s ease;
+      transition: transform 0.2s ease;
+    }
+
+    .nbs-control-root .nbs-toggle-btn svg {
+      width: 22px;
+      height: 22px;
     }
 
     /* 非全屏模式下的紧凑样式 */
-    .nbs-control-root.nbs-compact-mode .nbs-toggle-btn {
-      width: 24px;
-      height: 24px;
-      transform: scale(0.85);
-    }
     .nbs-control-root.nbs-compact-mode .nbs-toggle-btn svg {
-      width: 16px;
-      height: 16px;
+      width: 18px;
+      height: 18px;
     }
 
     .nbs-control-root .nbs-panel {
@@ -180,7 +179,7 @@
       margin-top: 4px;
     }
 
-    /* 独立还原按钮 - 美化样式，跟随鼠标显隐，响应式缩放 */
+    /* 独立还原按钮 - 美化样式，跟随播放器控制栏显隐，响应式缩放 */
     .nbs-reset-btn-global {
       position: absolute;
       left: 50%;
@@ -203,7 +202,13 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
       z-index: 22;
       white-space: nowrap;
-      transition: all 0.2s ease;
+      transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .nbs-reset-btn-global.show {
+      opacity: 1;
+      pointer-events: auto;
     }
     .nbs-reset-btn-global:hover {
       background: rgba(0, 0, 0, 0.9);
@@ -213,18 +218,19 @@
     }
     /* 非全屏紧凑模式缩小还原按钮 */
     .nbs-reset-btn-global.nbs-compact {
-      transform: translateX(-50%) scale(0.85);
-      font-size: 14px;
-      height: 30px;
-      padding: 0 16px;
+      height: 28px;
+      padding: 0 14px;
+      font-size: 13px;
+      border-radius: 28px;
     }
     .nbs-reset-btn-global.nbs-compact:hover {
-      transform: translateX(-50%) scale(0.87);
+      transform: translateX(-50%) scale(1.05);
     }
-    /* 鼠标静止3秒后隐藏按钮 */
-    .nbs-reset-btn-global.hide {
-      opacity: 0;
-      pointer-events: none;
+    /* 播放器控制栏隐藏时，还原按钮也隐藏 */
+    .bpx-player-container[data-refer=hide] .nbs-reset-btn-global,
+    .bpx-player-container[data-refer=hide] .nbs-toast {
+      opacity: 0 !important;
+      pointer-events: none !important;
     }
 
     /* Toast 提示 - 顶部居中，美化样式，响应式缩放 */
@@ -298,7 +304,6 @@
   let syncTimer = 0;
   let observer = null;
   let toastTimer = null;
-  let mouseIdleTimer = null;
   let playerContainer = null;
 
   function clamp(value, min, max) {
@@ -359,9 +364,9 @@
   function updateResetButtonVisibility() {
     if (!refs.resetButton) return;
     if (isDefaultState()) {
-      refs.resetButton.style.display = 'none';
+      refs.resetButton.classList.remove('show');
     } else {
-      refs.resetButton.style.display = 'flex';
+      refs.resetButton.classList.add('show');
     }
   }
 
@@ -370,10 +375,14 @@
     const container = getPlayerContainer();
     if (!container) return;
     const screenMode = container.dataset.screen || 'normal';
+    // 计算还原按钮位置：基于播放器高度的百分比
+    const containerHeight = container.clientHeight || 600;
     if (screenMode === 'full' || screenMode === 'web') {
-      refs.resetButton.style.bottom = '15%';
+      // 全屏/网页全屏：距底部12%（控制栏上方）
+      refs.resetButton.style.bottom = Math.round(containerHeight * 0.12) + 'px';
     } else {
-      refs.resetButton.style.bottom = '80px';
+      // 非全屏：距底部88px（B站控制栏高度+margin）
+      refs.resetButton.style.bottom = '62px';
     }
   }
 
@@ -579,26 +588,20 @@
     });
     modeObserver.observe(container, { attributes: true, attributeFilter: ['data-screen'] });
     updateCompactMode();
+    updateResetButtonPosition();
   }
 
-  // 监听播放器容器鼠标移动，控制还原按钮显隐
-  function initResetButtonMouseIdle() {
-    if (!playerContainer) return;
-    const resetBtn = refs.resetButton;
-    if (!resetBtn) return;
-
-    const resetIdle = () => {
-      if (mouseIdleTimer) clearTimeout(mouseIdleTimer);
-      resetBtn.classList.remove('hide');
-      mouseIdleTimer = setTimeout(() => {
-        if (resetBtn && !resetBtn.matches(':hover')) {
-          resetBtn.classList.add('hide');
-        }
-      }, 3000);
-    };
-
-    playerContainer.addEventListener('mousemove', resetIdle);
-    resetIdle(); // 初始显示
+  // 监听播放器控制栏显隐状态，同步控制还原按钮显隐
+  function initControlBarObserver() {
+    const container = getPlayerContainer();
+    if (!container) return;
+    
+    // 监听 data-refer 属性变化（hide/show）
+    const controlBarObserver = new MutationObserver(() => {
+      // CSS 选择器会自动处理显隐
+      // 这里可以添加额外逻辑
+    });
+    controlBarObserver.observe(container, { attributes: true, attributeFilter: ['data-refer'] });
   }
 
   // 更新提示文本
@@ -630,7 +633,8 @@
     refs.resetButton = btn;
     updateResetButtonVisibility();
     updateCompactMode();      // 确保紧凑样式
-    initResetButtonMouseIdle(); // 启动鼠标空闲检测
+    updateResetButtonPosition(); // 更新位置
+    initControlBarObserver();   // 监听控制栏显隐
   }
 
   function mountToast() {
@@ -757,6 +761,7 @@
     updateScaleUI();
     updateRotateUI();
     updateCompactMode(); // 应用初始紧凑模式
+    updateResetButtonPosition(); // 确保初始位置正确
   }
 
   function sync() {
@@ -768,6 +773,7 @@
     updateResetButtonPosition();
     applyTransform();
     initScreenModeObserver(); // 监听全屏切换
+    initControlBarObserver(); // 监听控制栏显隐
   }
 
   function scheduleSync() {
