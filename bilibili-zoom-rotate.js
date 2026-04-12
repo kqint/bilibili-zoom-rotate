@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
-// @version      6.0.6
+// @version      6.0.7
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @match        https://www.bilibili.com/video/*
@@ -419,8 +419,11 @@
       )
     );
 
+    // 还原按钮悬浮时不隐藏
+    const isResetButtonHovered = refs.resetButton && refs.resetButton.dataset.hover === 'true';
+
     if (refs.resetButton) {
-      refs.resetButton.classList.toggle('nbs-hidden-by-player', shouldHide);
+      refs.resetButton.classList.toggle('nbs-hidden-by-player', shouldHide && !isResetButtonHovered);
     }
     if (refs.toast) {
       refs.toast.classList.toggle('nbs-hidden-by-player', shouldHide);
@@ -753,6 +756,14 @@
       e.preventDefault();
       e.stopImmediatePropagation();
       resetTransform();
+    });
+    // 鼠标悬浮时阻止隐藏
+    btn.addEventListener('mouseenter', () => {
+      btn.dataset.hover = 'true';
+    });
+    btn.addEventListener('mouseleave', () => {
+      delete btn.dataset.hover;
+      scheduleOverlayVisibilitySync();
     });
     container.appendChild(btn);
     refs.resetButton = btn;
