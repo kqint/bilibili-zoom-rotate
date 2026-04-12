@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
-// @version      6.0.1
+// @version      6.0.5
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @match        https://www.bilibili.com/video/*
@@ -44,9 +44,12 @@
     .nbs-control-root {
       position: relative;
       user-select: none;
+      overflow: visible;
       display: flex;
       justify-content: center;
       align-items: center;
+      color: #fff !important;
+      opacity: 1 !important;
     }
 
     .nbs-control-root .nbs-toggle-btn {
@@ -57,17 +60,62 @@
       height: 100%;
       cursor: pointer;
       transition: transform 0.2s ease;
+      color: inherit !important;
+      opacity: 1 !important;
+    }
+
+    .nbs-control-root .bpx-player-ctrl-btn-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: inherit !important;
+      opacity: 1 !important;
+    }
+
+    .nbs-control-root .bpx-common-svg-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      color: inherit !important;
+      opacity: 1 !important;
     }
 
     .nbs-control-root .nbs-toggle-btn svg {
-      width: 22px;
-      height: 22px;
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-width: 24px;
+      max-height: 24px;
+      color: inherit !important;
+      opacity: 1 !important;
     }
 
-    /* 非全屏模式下的紧凑样式 */
     .nbs-control-root.nbs-compact-mode .nbs-toggle-btn svg {
-      width: 18px;
-      height: 18px;
+      max-width: 20px;
+      max-height: 20px;
+    }
+
+    .bpx-player-container[data-screen=full] .nbs-control-root .nbs-toggle-btn,
+    .bpx-player-container[data-screen=web] .nbs-control-root .nbs-toggle-btn {
+      position: relative;
+      top: -5px;
+    }
+
+    .bpx-player-container[data-screen=full] .nbs-control-root .nbs-toggle-btn svg,
+    .bpx-player-container[data-screen=web] .nbs-control-root .nbs-toggle-btn svg {
+      max-width: 26px;
+      max-height: 26px;
+      filter: drop-shadow(0 0 0 currentColor);
+    }
+
+    .nbs-control-root:hover,
+    .nbs-control-root:focus-within,
+    .nbs-control-root .nbs-toggle-btn:hover,
+    .nbs-control-root .nbs-toggle-btn:focus {
+      color: #fff !important;
+      opacity: 1 !important;
     }
 
     .nbs-control-root .nbs-panel {
@@ -375,10 +423,10 @@
     // 计算还原按钮位置：基于播放器高度的百分比
     const containerHeight = container.clientHeight || 600;
     if (screenMode === 'full' || screenMode === 'web') {
-      // 全屏/网页全屏：距底部12%（控制栏上方）
+      // 全屏/网页全屏
       refs.resetButton.style.bottom = Math.round(containerHeight * 0.12) + 'px';
     } else {
-      // 非全屏：距底部88px（B站控制栏高度+margin）
+      // 非全屏
       refs.resetButton.style.bottom = '120px';
     }
   }
@@ -677,7 +725,8 @@
       return;
     }
 
-    const anchor = document.querySelector('.bpx-player-ctrl-btn.bpx-player-ctrl-setting, .bpx-player-ctrl-setting');
+    const container = getPlayerContainer();
+    const anchor = container && container.querySelector('.bpx-player-ctrl-btn.bpx-player-ctrl-setting, .bpx-player-ctrl-setting');
     if (!anchor || !anchor.parentElement) return;
 
     const root = document.createElement('div');
@@ -686,9 +735,9 @@
     root.setAttribute('role', 'button');
     root.setAttribute('aria-label', '视频工具');
     root.innerHTML = `
-      <div class="nbs-toggle-btn" title="视频工具">
+      <div class="bpx-player-ctrl-btn-icon nbs-toggle-btn" title="视频工具">
         <span class="bpx-common-svg-icon">
-          <svg viewBox="0 0 1024 1024" width="20" height="20" aria-hidden="true">
+          <svg viewBox="0 0 1024 1024" aria-hidden="true">
             <path fill="currentColor" d="M894.4 184.32c0-30.72-25.6-56.32-56.32-56.32H185.92C155.2 128 129.6 153.6 129.6 184.32v250.88h76.8V204.8h611.84v414.72H742.4v76.8h95.68c30.72 0 56.32-25.6 56.32-56.32V184.32z"></path>
             <path fill="currentColor" d="M673.28 469.76H217.6c-49.92 0-89.6 39.68-89.6 89.6v244.48c0 49.92 39.68 89.6 89.6 89.6h455.68c49.92 0 89.6-39.68 89.6-89.6V559.36c0-49.92-39.68-89.6-89.6-89.6zM686.08 806.4c0 7.68-5.12 12.8-12.8 12.8H217.6c-7.68 0-12.8-5.12-12.8-12.8V559.36c0-7.68 5.12-12.8 12.8-12.8h455.68c7.68 0 12.8 5.12 12.8 12.8V806.4z"></path>
             <path fill="currentColor" d="M858.88 760.32l-76.8-76.8-53.76 53.76 76.8 76.8-76.8 76.8 53.76 53.76 76.8-76.8 76.8 76.8 53.76-53.76-76.8-76.8 76.8-76.8-53.76-53.76z"></path>
