@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name         B站视频增强：滑条缩放、旋转、拖拽
-// @version      6.0.0
+// @name         B站视频缩放、旋转
+// @version      6.0.1
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @match        https://www.bilibili.com/video/*
@@ -20,7 +20,7 @@
   }
   window.__newBiliScriptLoaded = true;
 
-  // 默认配置（仅保留拖拽修饰键）
+  // 默认配置
   const defaultConfig = {
     dragModifierKey: 'altKey',
   };
@@ -35,10 +35,7 @@
 
   function getModifierDisplayName(key) {
     const map = {
-      'ctrlKey': 'Ctrl',
       'altKey': 'Alt',
-      'shiftKey': 'Shift',
-      'metaKey': 'Win/Cmd'
     };
     return map[key] || key;
   }
@@ -112,7 +109,7 @@
 
     .nbs-control-root .nbs-scale-slider {
       flex: 1;
-      accent-color: var(--bpx-primary-color, #00AEEC);
+      accent-color: var(--bpx-primary-color, #00A1D6);
       cursor: pointer;
     }
 
@@ -123,7 +120,7 @@
       color: #fff;
     }
 
-    /* 旋转按钮区域 - 使用flex布局确保居中 */
+    /* 旋转按钮区域 */
     .nbs-control-root .nbs-rotate-items {
       display: flex;
       justify-content: center;
@@ -139,7 +136,7 @@
     }
     .nbs-control-root .nbs-rotate-slider {
       flex: 1;
-      accent-color: var(--bpx-primary-color, #00AEEC);
+      accent-color: var(--bpx-primary-color, #00A1D6);
       cursor: pointer;
     }
     .nbs-control-root .nbs-rotate-degree {
@@ -168,7 +165,7 @@
     }
 
     .nbs-control-root .nbs-rotate-btn.checked {
-      background: var(--bpx-primary-color, #00AEEC);
+      background: var(--bpx-primary-color, #00A1D6);
     }
 
     .nbs-control-root .nbs-tip {
@@ -179,7 +176,7 @@
       margin-top: 4px;
     }
 
-    /* 独立还原按钮 - 美化样式，跟随播放器控制栏显隐，响应式缩放 */
+    /* 独立还原按钮 */
     .nbs-reset-btn-global {
       position: absolute;
       left: 50%;
@@ -187,17 +184,17 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 36px;
-      padding: 0 20px;
+      height: 44px;
+      padding: 0 28px;
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-radius: 36px;
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
       letter-spacing: 0.5px;
       font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-      color: #FB7299;
+      color: #EFEFEF;
       cursor: pointer;
-      background: rgba(0, 0, 0, 0.75);
+      background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(8px);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
       z-index: 22;
@@ -212,7 +209,7 @@
     }
     .nbs-reset-btn-global:hover {
       background: rgba(0, 0, 0, 0.9);
-      color: #ff85a7;
+      color: #a7e9ff;
       transform: translateX(-50%) scale(1.02);
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
     }
@@ -233,16 +230,16 @@
       pointer-events: none !important;
     }
 
-    /* Toast 提示 - 顶部居中，美化样式，响应式缩放 */
+    /* Toast 提示 - 顶部居中 */
     .nbs-toast {
       position: absolute;
-      top: 15%;
+      top: 12%;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(16px);
       color: white;
-      padding: 14px 32px;
+      padding: 12px 28px;
       border-radius: 40px;
       font-size: 18px;
       font-weight: 600;
@@ -382,7 +379,7 @@
       refs.resetButton.style.bottom = Math.round(containerHeight * 0.12) + 'px';
     } else {
       // 非全屏：距底部88px（B站控制栏高度+margin）
-      refs.resetButton.style.bottom = '62px';
+      refs.resetButton.style.bottom = '120px';
     }
   }
 
@@ -608,7 +605,7 @@
   function updateShortcutTip() {
     if (!refs.tipText) return;
     const dragMod = getModifierDisplayName(userConfig.dragModifierKey);
-    refs.tipText.innerHTML = `拖拽移动：${dragMod}`;
+    refs.tipText.innerHTML = `拖拽移动：${dragMod} + 鼠标左键`;
   }
 
   // 挂载全局重置按钮
@@ -622,7 +619,7 @@
     }
     const btn = document.createElement('button');
     btn.className = 'nbs-reset-btn-global';
-    btn.textContent = '还原';
+    btn.textContent = '还原屏幕';
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
