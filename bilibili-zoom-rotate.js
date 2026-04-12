@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
-// @version      6.0.5
+// @version      6.0.6
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @match        https://www.bilibili.com/video/*
@@ -271,6 +271,11 @@
     .nbs-reset-btn-global.nbs-compact:hover {
       transform: translateX(-50%) scale(1.05);
     }
+    .nbs-reset-btn-global.nbs-hidden-by-player,
+    .nbs-toast.nbs-hidden-by-player {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
     /* 播放器控制栏隐藏时，还原按钮也隐藏 */
     .bpx-player-container[data-refer=hide] .nbs-reset-btn-global,
     .bpx-player-container[data-refer=hide] .nbs-toast {
@@ -350,6 +355,9 @@
   let observer = null;
   let toastTimer = null;
   let playerContainer = null;
+  let controlBarObserver = null;
+  let observedControlContainer = null;
+  let controlVisibilityRaf = 0;
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -377,6 +385,54 @@
       if (wrappedVideo) return wrappedVideo;
     }
     return document.querySelector('video');
+  }
+
+  function getControlVisibilityElement() {
+    const container = getPlayerContainer();
+    if (!container) return null;
+    return container.querySelector('.bpx-player-control-bottom')
+      || container.querySelector('.bpx-player-control-wrap')
+      || container.querySelector('.bpx-player-control-entity');
+  }
+
+  function isElementActuallyVisible(element) {
+    if (!element || !element.isConnected) return false;
+    const style = getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return false;
+    }
+    if (Number(style.opacity || '1') <= 0.05) {
+      return false;
+    }
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function syncPlayerOverlayVisibility() {
+    const container = getPlayerContainer();
+    const controlBar = getControlVisibilityElement();
+    const shouldHide = Boolean(
+      container
+      && (
+        container.dataset.refer === 'hide'
+        || (controlBar && !isElementActuallyVisible(controlBar))
+      )
+    );
+
+    if (refs.resetButton) {
+      refs.resetButton.classList.toggle('nbs-hidden-by-player', shouldHide);
+    }
+    if (refs.toast) {
+      refs.toast.classList.toggle('nbs-hidden-by-player', shouldHide);
+    }
+  }
+
+  function scheduleOverlayVisibilitySync() {
+    if (controlVisibilityRaf) return;
+    controlVisibilityRaf = requestAnimationFrame(() => {
+      controlVisibilityRaf = 0;
+      syncPlayerOverlayVisibility();
+    });
   }
 
   function getRotateFitScale(rotationDeg) {
@@ -413,6 +469,7 @@
     } else {
       refs.resetButton.classList.add('show');
     }
+    scheduleOverlayVisibilitySync();
   }
 
   function updateResetButtonPosition() {
@@ -465,6 +522,7 @@
     if (toastTimer) clearTimeout(toastTimer);
     refs.toast.textContent = message;
     refs.toast.classList.add('show');
+    scheduleOverlayVisibilitySync();
     toastTimer = setTimeout(() => {
       if (refs.toast) refs.toast.classList.remove('show');
     }, 1500);
@@ -640,13 +698,35 @@
   function initControlBarObserver() {
     const container = getPlayerContainer();
     if (!container) return;
-    
-    // 监听 data-refer 属性变化（hide/show）
-    const controlBarObserver = new MutationObserver(() => {
-      // CSS 选择器会自动处理显隐
-      // 这里可以添加额外逻辑
+
+    if (observedControlContainer === container && controlBarObserver) {
+      scheduleOverlayVisibilitySync();
+      return;
+    }
+
+    if (observedControlContainer && observedControlContainer !== container) {
+      observedControlContainer.removeEventListener('mousemove', scheduleOverlayVisibilitySync, true);
+      observedControlContainer.removeEventListener('mouseleave', scheduleOverlayVisibilitySync, true);
+    }
+
+    if (controlBarObserver) {
+      controlBarObserver.disconnect();
+    }
+
+    observedControlContainer = container;
+    controlBarObserver = new MutationObserver(() => {
+      scheduleOverlayVisibilitySync();
     });
-    controlBarObserver.observe(container, { attributes: true, attributeFilter: ['data-refer'] });
+    controlBarObserver.observe(container, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      attributeFilter: ['data-refer', 'class', 'style', 'data-state']
+    });
+
+    container.addEventListener('mousemove', scheduleOverlayVisibilitySync, true);
+    container.addEventListener('mouseleave', scheduleOverlayVisibilitySync, true);
+    scheduleOverlayVisibilitySync();
   }
 
   // 更新提示文本
@@ -680,6 +760,7 @@
     updateCompactMode();      // 确保紧凑样式
     updateResetButtonPosition(); // 更新位置
     initControlBarObserver();   // 监听控制栏显隐
+    scheduleOverlayVisibilitySync();
   }
 
   function mountToast() {
@@ -691,6 +772,7 @@
     container.appendChild(toast);
     refs.toast = toast;
     updateCompactMode(); // 应用紧凑样式
+    scheduleOverlayVisibilitySync();
   }
 
   function bindVideoWrap() {
@@ -820,6 +902,7 @@
     applyTransform();
     initScreenModeObserver(); // 监听全屏切换
     initControlBarObserver(); // 监听控制栏显隐
+    scheduleOverlayVisibilitySync();
   }
 
   function scheduleSync() {
