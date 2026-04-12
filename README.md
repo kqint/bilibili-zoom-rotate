@@ -11,6 +11,8 @@
 - **拖拽移动**：按住 `Alt键 + 鼠标左键` 可拖拽移动视频位置
 - **还原屏幕**：当视频被缩放、旋转或移动时，播放器中央显示还原按钮，一键恢复默认状态
 
+![alt text](assets/功能演示.png)
+
 ## 安装方法
 
 1. 安装浏览器扩展：[Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)
