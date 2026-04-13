@@ -12,8 +12,6 @@
 - **还原屏幕**：当视频被缩放、旋转或移动时，播放器中央显示还原按钮，一键恢复默认状态
 - **快捷键更改**：可在`shortcutConfig`中更改快捷键
 
-![alt text](assets/功能演示.png)
-
 ## 安装方法
 
 1. 安装浏览器扩展：[Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)
@@ -30,6 +28,8 @@
 - **缩放滑块**：拖动调整视频大小（50%-250%）
 - **旋转按钮**：点击0°/90°/180°/270°快速旋转
 - **精细旋转滑块**：拖动进行任意角度旋转（0-359°）
+
+![alt text](assets/功能演示.png)
 
 ### 拖拽移动
 
