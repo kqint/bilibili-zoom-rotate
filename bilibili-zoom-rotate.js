@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
-// @version      6.0.9
+// @version      6.1.0
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
@@ -21,22 +21,42 @@
   }
   window.__newBiliScriptLoaded = true;
 
+  // 快捷键配置
+  const shortcutConfig = {
+    dragModifierKey: 'altKey',
+    wheelZoomModifierKey: 'altKey',
+  };
+
+  // Alt+滚轮缩放配置（单位：百分比）
+  const wheelZoomConfig = {
+    stepPercent: 1,
+  };
+
   // 默认配置
   const defaultConfig = {
-    dragModifierKey: 'altKey',
+    dragModifierKey: shortcutConfig.dragModifierKey,
+    wheelZoomModifierKey: shortcutConfig.wheelZoomModifierKey,
+    wheelZoomStepPercent: wheelZoomConfig.stepPercent,
   };
 
   let userConfig = {
     dragModifierKey: GM_getValue('dragModifierKey', defaultConfig.dragModifierKey),
+    wheelZoomModifierKey: GM_getValue('wheelZoomModifierKey', defaultConfig.wheelZoomModifierKey),
+    wheelZoomStepPercent: GM_getValue('wheelZoomStepPercent', defaultConfig.wheelZoomStepPercent),
   };
 
   function saveConfig() {
     GM_setValue('dragModifierKey', userConfig.dragModifierKey);
+    GM_setValue('wheelZoomModifierKey', userConfig.wheelZoomModifierKey);
+    GM_setValue('wheelZoomStepPercent', userConfig.wheelZoomStepPercent);
   }
 
   function getModifierDisplayName(key) {
     const map = {
       'altKey': 'Alt',
+      'ctrlKey': 'Ctrl',
+      'shiftKey': 'Shift',
+      'metaKey': 'Meta',
     };
     return map[key] || key;
   }
@@ -597,10 +617,10 @@
     // 无功能
   }
 
-  // Alt+鼠标滚轮控制缩放
+  // 快捷键 + 鼠标滚轮控制缩放
   function onWheel(event) {
-    // 检查是否按住 Alt 键
-    if (!event.altKey) return;
+    // 检查是否按住配置的快捷键
+    if (!event[userConfig.wheelZoomModifierKey]) return;
     
     // 检查目标是否在视频区域内
     const target = event.target;
@@ -610,8 +630,9 @@
     event.preventDefault();
     event.stopPropagation();
     
-    // 根据滚轮方向调整缩放
-    const delta = event.deltaY > 0 ? -1 : 1;
+    // 根据滚轮方向和配置精度调整缩放
+    const step = Math.max(1, Math.round(Number(userConfig.wheelZoomStepPercent) || 1));
+    const delta = event.deltaY > 0 ? -step : step;
     const newScale = state.scalePercent + delta;
     setScale(newScale);
   }
@@ -756,7 +777,9 @@
   function updateShortcutTip() {
     if (!refs.tipText) return;
     const dragMod = getModifierDisplayName(userConfig.dragModifierKey);
-    refs.tipText.innerHTML = `拖拽移动：${dragMod} + 鼠标左键<br>滚轮缩放：${dragMod} + 滚轮`;
+    const wheelMod = getModifierDisplayName(userConfig.wheelZoomModifierKey);
+    const wheelStep = Math.max(1, Math.round(Number(userConfig.wheelZoomStepPercent) || 1));
+    refs.tipText.innerHTML = `拖拽移动：${dragMod} + 鼠标左键<br>滚轮缩放：${wheelMod} + 滚轮（步进 ${wheelStep}%）`;
   }
 
   // 挂载全局重置按钮
