@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
-// @version      6.1.1
+// @namespace    https://github.com/kqint
+// @version      6.1.2
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，条件还原按钮，缩放Toast提示
 // @author       kqint
+// @license      MIT
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/list/watchlater/*
