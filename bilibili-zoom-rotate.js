@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
-// @version      6.0.8
-// @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽，条件还原按钮，缩放Toast提示
+// @version      6.0.9
+// @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
 // @match        https://www.bilibili.com/video/*
@@ -597,6 +597,25 @@
     // 无功能
   }
 
+  // Alt+鼠标滚轮控制缩放
+  function onWheel(event) {
+    // 检查是否按住 Alt 键
+    if (!event.altKey) return;
+    
+    // 检查目标是否在视频区域内
+    const target = event.target;
+    if (!videoWrap || !videoWrap.contains(target)) return;
+    
+    // 阻止默认滚轮行为（页面滚动）
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // 根据滚轮方向调整缩放
+    const delta = event.deltaY > 0 ? -1 : 1;
+    const newScale = state.scalePercent + delta;
+    setScale(newScale);
+  }
+
   function onMouseMove(event) {
     if (!state.isDragging) return;
     state.offsetX = event.clientX - state.dragStartX;
@@ -737,7 +756,7 @@
   function updateShortcutTip() {
     if (!refs.tipText) return;
     const dragMod = getModifierDisplayName(userConfig.dragModifierKey);
-    refs.tipText.innerHTML = `拖拽移动：${dragMod} + 鼠标左键`;
+    refs.tipText.innerHTML = `拖拽移动：${dragMod} + 鼠标左键<br>滚轮缩放：${dragMod} + 滚轮`;
   }
 
   // 挂载全局重置按钮
@@ -799,6 +818,7 @@
 
     videoWrap = nextWrap;
     videoWrap.addEventListener('mousedown', onVideoMouseDown);
+    videoWrap.addEventListener('wheel', onWheel, { passive: false });
 
     // 重置状态
     state.scalePercent = 100;
@@ -874,6 +894,11 @@
     refs.rotateSlider = root.querySelector('.nbs-rotate-slider');
     refs.rotateDegree = root.querySelector('.nbs-rotate-degree');
     refs.tipText = root.querySelector('.nbs-tip');
+
+    // 绑定滚轮事件到视频包装器
+    if (videoWrap) {
+      videoWrap.addEventListener('wheel', onWheel, { passive: false });
+    }
 
     refs.toggleBtn.addEventListener('mouseenter', showPanel);
     refs.toggleBtn.addEventListener('mouseleave', scheduleHidePanel);
