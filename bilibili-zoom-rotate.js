@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
-// @version      6.1.0
+// @version      6.1.1
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
@@ -335,6 +335,11 @@
     .nbs-toast.show {
       opacity: 1;
     }
+    /* 强制显示类 */
+    .nbs-toast.nbs-force-show {
+      opacity: 1 !important;
+      pointer-events: none !important;
+    }
 
     /* 拖拽时临时禁用视频上的点击事件 */
     .bpx-player-video-wrap.nbs-dragging {
@@ -439,14 +444,14 @@
         || (controlBar && !isElementActuallyVisible(controlBar))
       )
     );
-
     // 还原按钮悬浮时不隐藏
     const isResetButtonHovered = refs.resetButton && refs.resetButton.dataset.hover === 'true';
-
     if (refs.resetButton) {
       refs.resetButton.classList.toggle('nbs-hidden-by-player', shouldHide && !isResetButtonHovered);
     }
-    if (refs.toast) {
+    
+    // Toast 强制显示时不隐藏
+    if (refs.toast && !refs.toast.classList.contains('nbs-force-show')) {
       refs.toast.classList.toggle('nbs-hidden-by-player', shouldHide);
     }
   }
@@ -544,11 +549,21 @@
   function showToast(message) {
     if (!refs.toast) return;
     if (toastTimer) clearTimeout(toastTimer);
+    
+    // 强制显示模式：添加强制显示类，忽略播放器隐藏状态
+    refs.toast.classList.add('nbs-force-show');
+    refs.toast.classList.remove('nbs-hidden-by-player');
+    
     refs.toast.textContent = message;
     refs.toast.classList.add('show');
-    scheduleOverlayVisibilitySync();
+    
     toastTimer = setTimeout(() => {
-      if (refs.toast) refs.toast.classList.remove('show');
+      if (refs.toast) {
+        refs.toast.classList.remove('show');
+        refs.toast.classList.remove('nbs-force-show');
+        // 恢复同步状态检查
+        scheduleOverlayVisibilitySync();
+      }
     }, 1500);
   }
 
