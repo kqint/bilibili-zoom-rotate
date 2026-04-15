@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
 // @namespace    https://github.com/kqint
-// @version      6.1.2
+// @version      6.1.4
 // @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，条件还原按钮，缩放Toast提示
 // @author       kqint
 // @license      MIT
@@ -355,11 +355,16 @@
   const state = {
     scalePercent: 100,
     rotation: 0,
+    // 使用百分比存储偏移（-1 到 1 范围，表示视频容器宽高的百分比）
     offsetX: 0,
     offsetY: 0,
     isDragging: false,
-    dragStartX: 0,
-    dragStartY: 0,
+    // 拖拽开始时的初始偏移百分比
+    dragStartOffsetX: 0,
+    dragStartOffsetY: 0,
+    // 拖拽开始时的鼠标位置
+    dragStartClientX: 0,
+    dragStartClientY: 0,
     justDragged: false,
   };
 
@@ -386,6 +391,9 @@
   let controlBarObserver = null;
   let observedControlContainer = null;
   let controlVisibilityRaf = 0;
+  // 全屏切换防抖
+  let screenModeChangeTimer = null;
+  let isScreenModeChanging = false;
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -572,9 +580,16 @@
   function applyTransform() {
     if (!videoWrap) return;
     const effectiveScale = getEffectiveScale();
+    // 将百分比偏移转换为像素值（基于视频容器当前尺寸）
+    const containerWidth = videoWrap.clientWidth || 1;
+    const containerHeight = videoWrap.clientHeight || 1;
+    const pixelOffsetX = state.offsetX * containerWidth;
+    const pixelOffsetY = state.offsetY * containerHeight;
     videoWrap.style.transformOrigin = 'center center';
-    videoWrap.style.transition = state.isDragging ? 'none' : 'transform 0.22s ease';
-    videoWrap.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) rotate(${state.rotation}deg) scale(${effectiveScale})`;
+    // 全屏切换期间禁用过渡动画以提升性能
+    const useTransition = !state.isDragging && !isScreenModeChanging;
+    videoWrap.style.transition = useTransition ? 'transform 0.22s ease' : 'none';
+    videoWrap.style.transform = `translate(${pixelOffsetX}px, ${pixelOffsetY}px) rotate(${state.rotation}deg) scale(${effectiveScale})`;
     updateScaleUI();
     updateRotateUI();
     updateResetButtonVisibility();
@@ -655,9 +670,15 @@
   }
 
   function onMouseMove(event) {
-    if (!state.isDragging) return;
-    state.offsetX = event.clientX - state.dragStartX;
-    state.offsetY = event.clientY - state.dragStartY;
+    if (!state.isDragging || !videoWrap) return;
+    // 计算鼠标移动的像素差值
+    const deltaX = event.clientX - state.dragStartClientX;
+    const deltaY = event.clientY - state.dragStartClientY;
+    // 转换为百分比偏移（基于当前视频容器尺寸）
+    const containerWidth = videoWrap.clientWidth || 1;
+    const containerHeight = videoWrap.clientHeight || 1;
+    state.offsetX = state.dragStartOffsetX + deltaX / containerWidth;
+    state.offsetY = state.dragStartOffsetY + deltaY / containerHeight;
     applyTransform();
   }
 
@@ -688,8 +709,11 @@
     if (!event[userConfig.dragModifierKey]) return;
 
     state.isDragging = true;
-    state.dragStartX = event.clientX - state.offsetX;
-    state.dragStartY = event.clientY - state.offsetY;
+    // 记录拖拽开始时的偏移百分比和鼠标位置
+    state.dragStartOffsetX = state.offsetX;
+    state.dragStartOffsetY = state.offsetY;
+    state.dragStartClientX = event.clientX;
+    state.dragStartClientY = event.clientY;
 
     if (videoWrap) {
       videoWrap.classList.add('nbs-dragging');
@@ -746,9 +770,21 @@
     const container = getPlayerContainer();
     if (!container) return;
     const modeObserver = new MutationObserver(() => {
-      updateCompactMode();
-      updatePanelPosition();
-      updateResetButtonPosition();
+      // 防抖处理：全屏切换期间标记状态，禁用过渡动画
+      if (screenModeChangeTimer) {
+        clearTimeout(screenModeChangeTimer);
+      }
+      isScreenModeChanging = true;
+      // 立即应用一次transform（无过渡）
+      applyTransform();
+      // 延迟更新UI，等待全屏动画完成
+      screenModeChangeTimer = setTimeout(() => {
+        isScreenModeChanging = false;
+        applyTransform();
+        updateCompactMode();
+        updatePanelPosition();
+        updateResetButtonPosition();
+      }, 150);
     });
     modeObserver.observe(container, { attributes: true, attributeFilter: ['data-screen'] });
     updateCompactMode();
