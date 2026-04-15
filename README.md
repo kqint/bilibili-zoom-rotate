@@ -14,10 +14,22 @@
 
 ## 安装方法
 
-1. 安装浏览器扩展：[Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)
-2. 点击扩展图标，选择"添加新脚本"
-3. 将 `bilibili-zoom-rotate.js` 文件内容复制粘贴到编辑器中
-4. 保存脚本（Ctrl+S 或 Cmd+S）
+先安装浏览器扩展：[Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)
+
+#### 方式一：从 GreasyFork 一键安装
+
+1. 在浏览器中打开链接：[B站视频缩放、旋转](https://greasyfork.org/zh-CN/scripts/573748-b%E7%AB%99%E8%A7%86%E9%A2%91%E7%BC%A9%E6%94%BE-%E6%97%8B%E8%BD%AC)
+2. 点击页面上的 **“安装此脚本”** 绿色按钮。
+3. 脚本管理器会弹出新窗口，点击 **“安装”** 即可。
+
+#### 方式二：手动复制脚本内容安装
+
+1. 在 [bilibili-zoom-rotate.js](https://github.com/kqint/bilibili-zoom-rotate/blob/main/bilibili-zoom-rotate.js) 中复制完整代码
+2. 点击浏览器右上角的脚本管理器图标（Tampermonkey 或 Violentmonkey）。
+3. 选择 **“添加新脚本”**（或“新建用户脚本”）。
+4. 删除编辑器中默认的所有代码，**完整粘贴** 刚刚的代码。
+5. 按 `Ctrl+S` (Windows/Linux) 或 `Cmd+S` (Mac) 保存。
+6. 保存后，脚本即会生效。您刷新 B 站视频页面即可测试。
 
 ## 使用方法
 
