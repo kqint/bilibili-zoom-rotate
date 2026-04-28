@@ -388,12 +388,15 @@
   let observer = null;
   let toastTimer = null;
   let playerContainer = null;
+  let lastSyncedContainer = null;
   let controlBarObserver = null;
   let observedControlContainer = null;
   let controlVisibilityRaf = 0;
   // 全屏切换防抖
   let screenModeChangeTimer = null;
   let isScreenModeChanging = false;
+  let screenModeObserver = null;
+  let observedScreenModeContainer = null;
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -769,7 +772,19 @@
   function initScreenModeObserver() {
     const container = getPlayerContainer();
     if (!container) return;
-    const modeObserver = new MutationObserver(() => {
+
+    // 容器没变且已有 observer，跳过
+    if (observedScreenModeContainer === container && screenModeObserver) {
+      return;
+    }
+
+    // 断开旧的 observer
+    if (screenModeObserver) {
+      screenModeObserver.disconnect();
+    }
+
+    observedScreenModeContainer = container;
+    screenModeObserver = new MutationObserver(() => {
       // 防抖处理：全屏切换期间标记状态，禁用过渡动画
       if (screenModeChangeTimer) {
         clearTimeout(screenModeChangeTimer);
@@ -786,7 +801,7 @@
         updateResetButtonPosition();
       }, 150);
     });
-    modeObserver.observe(container, { attributes: true, attributeFilter: ['data-screen'] });
+    screenModeObserver.observe(container, { attributes: true, attributeFilter: ['data-screen'] });
     updateCompactMode();
     updateResetButtonPosition();
   }
@@ -889,6 +904,7 @@
 
     if (videoWrap) {
       videoWrap.removeEventListener('mousedown', onVideoMouseDown);
+      videoWrap.removeEventListener('wheel', onWheel);
       videoWrap.classList.remove('nbs-dragging');
     }
 
@@ -971,11 +987,6 @@
     refs.rotateDegree = root.querySelector('.nbs-rotate-degree');
     refs.tipText = root.querySelector('.nbs-tip');
 
-    // 绑定滚轮事件到视频包装器
-    if (videoWrap) {
-      videoWrap.addEventListener('wheel', onWheel, { passive: false });
-    }
-
     refs.toggleBtn.addEventListener('mouseenter', showPanel);
     refs.toggleBtn.addEventListener('mouseleave', scheduleHidePanel);
     refs.panel.addEventListener('mouseenter', clearHideTimer);
@@ -1006,15 +1017,23 @@
   }
 
   function sync() {
+    const container = getPlayerContainer();
+    const containerChanged = (container !== lastSyncedContainer);
+
     bindVideoWrap();
     mountGlobalResetButton();
     mountToast();
     mountControlPanel();
+
+    if (containerChanged) {
+      lastSyncedContainer = container;
+      initScreenModeObserver();
+      initControlBarObserver();
+    }
+
     updatePanelPosition();
     updateResetButtonPosition();
     applyTransform();
-    initScreenModeObserver(); // 监听全屏切换
-    initControlBarObserver(); // 监听控制栏显隐
     scheduleOverlayVisibilitySync();
   }
 
