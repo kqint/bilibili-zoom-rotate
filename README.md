@@ -26,15 +26,21 @@ Bilibili网页端脚本，提供视频缩放、旋转、拖拽移动和视频状
 
 ## 安装方法
 
-先安装浏览器扩展：[Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)
+先安装浏览器扩展：[Tampermonkey](https://www.tampermonkey.net/)、[Violentmonkey](https://violentmonkey.github.io/) 或 [脚本猫](https://docs.scriptcat.org/)
 
-#### 方式一：从 GreasyFork 一键安装
+#### 方式一：从脚本猫（ScriptCat）一键安装
+
+1. 在浏览器中打开链接：[B站视频缩放、旋转 - 脚本猫](https://scriptcat.org/zh-CN/script-show-page/6120)
+2. 点击页面上的 **"安装脚本"** 按钮。
+3. 脚本管理器会弹出确认窗口，点击 **"安装"** 即可。
+
+#### 方式二：从 GreasyFork 一键安装
 
 1. 在浏览器中打开链接：[B站视频缩放、旋转](https://greasyfork.org/zh-CN/scripts/573748-b%E7%AB%99%E8%A7%86%E9%A2%91%E7%BC%A9%E6%94%BE-%E6%97%8B%E8%BD%AC)
 2. 点击页面上的 **“安装此脚本”** 绿色按钮。
 3. 脚本管理器会弹出新窗口，点击 **“安装”** 即可。
 
-#### 方式二：手动复制脚本内容安装
+#### 方式三：手动复制脚本内容安装
 
 1. 在 [bilibili-zoom-rotate.js](https://github.com/kqint/bilibili-zoom-rotate/blob/main/bilibili-zoom-rotate.js) 中复制完整代码
 2. 点击浏览器右上角的脚本管理器图标（Tampermonkey 或 Violentmonkey）。
