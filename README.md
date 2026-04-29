@@ -41,7 +41,12 @@ Bilibili网页端脚本，提供视频缩放、旋转、拖拽移动和视频状
 3. 选择 **“添加新脚本”**（或“新建用户脚本”）。
 4. 删除编辑器中默认的所有代码，**完整粘贴** 刚刚的代码。
 5. 按 `Ctrl+S` (Windows/Linux) 或 `Cmd+S` (Mac) 保存。
-6. 保存后，脚本即会生效。您刷新 B 站视频页面即可测试。
+6. 保存后，脚本即会生效。
+
+## 问题反馈与建议
+
+欢迎通过 GitHub Issues 提交您的问题、建议或Bug报告。  
+👉 [点击此处进入 Issues 页面](https://github.com/kqint/bilibili-zoom-rotate/issues)
 
 ## 许可证
 
