@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
 // @namespace    https://github.com/kqint
-// @version      6.1.4
-// @description  右下角悬停面板控制缩放(50%-250%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，条件还原按钮，缩放Toast提示
+// @version      6.2.0
+// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示
 // @author       kqint
 // @license      MIT
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
 // @match        https://www.bilibili.com/video/*
-// @match        https://www.bilibili.com/list/watchlater/*
+// @match        https://www.bilibili.com/list/watchlater*
 // @match        https://www.bilibili.com/medialist/play/*
 // @icon         https://www.bilibili.com/favicon.ico
 // @grant        GM_addStyle
@@ -46,12 +46,6 @@
     wheelZoomModifierKey: GM_getValue('wheelZoomModifierKey', defaultConfig.wheelZoomModifierKey),
     wheelZoomStepPercent: GM_getValue('wheelZoomStepPercent', defaultConfig.wheelZoomStepPercent),
   };
-
-  function saveConfig() {
-    GM_setValue('dragModifierKey', userConfig.dragModifierKey);
-    GM_setValue('wheelZoomModifierKey', userConfig.wheelZoomModifierKey);
-    GM_setValue('wheelZoomStepPercent', userConfig.wheelZoomStepPercent);
-  }
 
   function getModifierDisplayName(key) {
     const map = {
@@ -192,7 +186,8 @@
     }
 
     /* 旋转按钮区域 */
-    .nbs-control-root .nbs-rotate-items {
+    .nbs-control-root .nbs-rotate-items,
+    .nbs-control-root .nbs-scale-items {
       display: flex;
       justify-content: center;
       gap: 12px;
@@ -225,10 +220,12 @@
       border-radius: 6px;
       color: #fff;
       font-size: 12px;
-      text-align: center;
       cursor: pointer;
       background: rgba(255, 255, 255, 0.24);
       transition: background-color 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .nbs-control-root .nbs-rotate-btn:hover {
@@ -239,12 +236,114 @@
       background: var(--bpx-primary-color, #00A1D6);
     }
 
+    /* 快捷缩放按钮 */
+    .nbs-control-root .nbs-scale-btn {
+      flex: 0 0 auto;
+      width: 48px;
+      height: 28px;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.24);
+      transition: background-color 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nbs-control-root .nbs-scale-btn:hover {
+      background: rgba(255, 255, 255, 0.36);
+    }
+
+    .nbs-control-root .nbs-scale-btn.checked {
+      background: var(--bpx-primary-color, #00A1D6);
+    }
+
+    /* 独立重置图标按钮 */
+    .nbs-control-root .nbs-reset-icon {
+      flex: 0 0 auto;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: 4px;
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.18s ease, background 0.18s ease;
+      padding: 2px;
+    }
+
+    .nbs-control-root .nbs-reset-icon:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
     .nbs-control-root .nbs-tip {
       font-size: 11px;
       color: rgba(255, 255, 255, 0.7);
       line-height: 1.3;
-      text-align: center;
-      margin-top: 4px;
+      text-align: left;
+      margin: 0 2px;
+      
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+    }
+
+    /* 视频记忆开关 */
+    .nbs-control-root .nbs-memory-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+    }
+    .nbs-control-root .nbs-memory-row label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.88);
+    }
+    .nbs-control-root .nbs-memory-toggle {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .nbs-control-root .nbs-memory-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .nbs-control-root .nbs-memory-slider {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      transition: background 0.2s ease;
+    }
+    .nbs-control-root .nbs-memory-slider::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 2px;
+      top: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+    .nbs-control-root .nbs-memory-toggle input:checked + .nbs-memory-slider {
+      background: var(--bpx-primary-color, #00A1D6);
+    }
+    .nbs-control-root .nbs-memory-toggle input:checked + .nbs-memory-slider::before {
+      transform: translateX(16px);
     }
 
     /* 独立还原按钮 */
@@ -374,12 +473,16 @@
     panel: null,
     scaleSlider: null,
     scaleValue: null,
+    scaleButtons: [],
+    scaleReset: null,
     rotateButtons: [],
     rotateSlider: null,
     rotateDegree: null,
+    rotateReset: null,
     resetButton: null,
     toast: null,
     tipText: null,
+    memoryToggle: null,
   };
 
   let videoWrap = null;
@@ -387,7 +490,6 @@
   let syncTimer = 0;
   let observer = null;
   let toastTimer = null;
-  let playerContainer = null;
   let lastSyncedContainer = null;
   let controlBarObserver = null;
   let observedControlContainer = null;
@@ -397,17 +499,12 @@
   let isScreenModeChanging = false;
   let screenModeObserver = null;
   let observedScreenModeContainer = null;
+  let currentVideoId = null;
+  let saveStateTimer = null;
+  let videoMemoryEnabled = localStorage.getItem('nbs_memoryEnabled') !== 'false';
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
-  }
-
-  function isEditableTarget(target) {
-    if (!target) return false;
-    const el = target;
-    if (el.isContentEditable) return true;
-    const tag = el.tagName;
-    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
   }
 
   function getPlayerContainer() {
@@ -424,6 +521,67 @@
       if (wrappedVideo) return wrappedVideo;
     }
     return document.querySelector('video');
+  }
+
+  function getVideoId() {
+    const path = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+
+    let bvid = null;
+    const pathMatch = path.match(/\/(?:video|list\/watchlater)\/(BV[^/?#]+)/);
+    if (pathMatch) {
+      bvid = pathMatch[1];
+    }
+
+    if (!bvid) {
+      bvid = urlParams.get('bvid');
+    }
+
+    if (bvid) {
+      const p = urlParams.get('p');
+      return p ? `${bvid}-p${p}` : bvid;
+    }
+    return path;
+  }
+
+  function saveVideoState() {
+    if (!videoMemoryEnabled || !currentVideoId) return;
+    const key = 'nbs_videoState_' + currentVideoId;
+    if (isDefaultState()) {
+      localStorage.removeItem(key);
+      return;
+    }
+    localStorage.setItem(key, JSON.stringify({
+      scalePercent: state.scalePercent,
+      rotation: state.rotation,
+      offsetX: state.offsetX,
+      offsetY: state.offsetY,
+    }));
+  }
+
+  function scheduleSaveState() {
+    if (saveStateTimer) clearTimeout(saveStateTimer);
+    saveStateTimer = setTimeout(() => {
+      saveStateTimer = 0;
+      saveVideoState();
+    }, 500);
+  }
+
+  function loadVideoState(videoId) {
+    if (!videoId) return false;
+    try {
+      const raw = localStorage.getItem('nbs_videoState_' + videoId);
+      if (!raw) return false;
+      const saved = JSON.parse(raw);
+      if (!saved || typeof saved.scalePercent !== 'number') return false;
+      state.scalePercent = clamp(Math.round(saved.scalePercent), 50, 350);
+      state.rotation = ((saved.rotation % 360) + 360) % 360;
+      state.offsetX = clamp(Number(saved.offsetX) || 0, -1, 1);
+      state.offsetY = clamp(Number(saved.offsetY) || 0, -1, 1);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function getControlVisibilityElement() {
@@ -544,6 +702,10 @@
     if (refs.scaleValue) {
       refs.scaleValue.textContent = state.scalePercent + '%';
     }
+    refs.scaleButtons.forEach((btn) => {
+      const s = Number(btn.dataset.scale);
+      btn.classList.toggle('checked', s === state.scalePercent);
+    });
   }
 
   function updateRotateUI() {
@@ -600,10 +762,11 @@
   }
 
   function setScale(nextScale) {
-    const newScale = clamp(Math.round(nextScale), 50, 250);
+    const newScale = clamp(Math.round(nextScale), 50, 350);
     if (state.scalePercent === newScale) return;
     state.scalePercent = newScale;
     applyTransform();
+    scheduleSaveState();
     showToast(`缩放: ${state.scalePercent}%`);
   }
 
@@ -613,7 +776,24 @@
     if (state.rotation === normalized) return;
     state.rotation = normalized;
     applyTransform();
+    scheduleSaveState();
     showToast(`旋转: ${state.rotation}°`);
+  }
+
+  function resetScale() {
+    if (state.scalePercent === 100) return;
+    state.scalePercent = 100;
+    applyTransform();
+    scheduleSaveState();
+    showToast('缩放已重置');
+  }
+
+  function resetRotation() {
+    if (state.rotation === 0) return;
+    state.rotation = 0;
+    applyTransform();
+    scheduleSaveState();
+    showToast('旋转已重置');
   }
 
   function resetTransform() {
@@ -623,6 +803,7 @@
     state.offsetX = 0;
     state.offsetY = 0;
     applyTransform();
+    scheduleSaveState();
     showToast('已还原');
   }
 
@@ -693,6 +874,7 @@
       videoWrap.classList.remove('nbs-dragging');
     }
     applyTransform();
+    scheduleSaveState();
     setTimeout(() => {
       state.justDragged = false;
     }, 100);
@@ -847,7 +1029,7 @@
     const dragMod = getModifierDisplayName(userConfig.dragModifierKey);
     const wheelMod = getModifierDisplayName(userConfig.wheelZoomModifierKey);
     const wheelStep = Math.max(1, Math.round(Number(userConfig.wheelZoomStepPercent) || 1));
-    refs.tipText.innerHTML = `拖拽移动：${dragMod} + 鼠标左键<br>滚轮缩放：${wheelMod} + 滚轮（步进 ${wheelStep}%）`;
+    refs.tipText.innerHTML = `拖拽移动：${dragMod} + 鼠标左键<br>滚轮缩放：${wheelMod} + 滚轮（步进 ${wheelStep}%）<br>记住视频状态：开启后，下次打开相同视频自动恢复上次的缩放/旋转/位置`;
   }
 
   // 挂载全局重置按钮
@@ -855,7 +1037,6 @@
     if (refs.resetButton && refs.resetButton.isConnected) return;
     const container = getPlayerContainer();
     if (!container) return;
-    playerContainer = container;
     if (getComputedStyle(container).position === 'static') {
       container.style.position = 'relative';
     }
@@ -899,24 +1080,45 @@
 
   function bindVideoWrap() {
     const nextWrap = getVideoWrap();
-    if (!nextWrap) return;
-    if (nextWrap === videoWrap) return;
+    const newVideoId = getVideoId();
+    const wrapChanged = (nextWrap !== videoWrap);
+    const videoIdChanged = (newVideoId !== currentVideoId);
 
-    if (videoWrap) {
+    // 视频切换时，先保存旧视频状态（必须在检查 nextWrap 是否存在之前）
+    if (videoWrap && currentVideoId && (wrapChanged || videoIdChanged)) {
+      saveVideoState();
+      if (saveStateTimer) {
+        clearTimeout(saveStateTimer);
+        saveStateTimer = 0;
+      }
+    }
+
+    if (!nextWrap) return;
+    if (!wrapChanged && !videoIdChanged) return;
+
+    // 清理旧的 videoWrap
+    if (videoWrap && wrapChanged) {
       videoWrap.removeEventListener('mousedown', onVideoMouseDown);
       videoWrap.removeEventListener('wheel', onWheel);
       videoWrap.classList.remove('nbs-dragging');
     }
 
-    videoWrap = nextWrap;
-    videoWrap.addEventListener('mousedown', onVideoMouseDown);
-    videoWrap.addEventListener('wheel', onWheel, { passive: false });
+    // 绑定新的 videoWrap
+    if (wrapChanged) {
+      videoWrap = nextWrap;
+      videoWrap.addEventListener('mousedown', onVideoMouseDown);
+      videoWrap.addEventListener('wheel', onWheel, { passive: false });
+    }
 
-    // 重置状态
-    state.scalePercent = 100;
-    state.rotation = 0;
-    state.offsetX = 0;
-    state.offsetY = 0;
+    currentVideoId = newVideoId;
+
+    // 尝试加载保存的状态
+    if (!videoMemoryEnabled || !loadVideoState(newVideoId)) {
+      state.scalePercent = 100;
+      state.rotation = 0;
+      state.offsetX = 0;
+      state.offsetY = 0;
+    }
     state.isDragging = false;
     state.justDragged = false;
 
@@ -939,9 +1141,8 @@
     root.id = 'nbs-control-root';
     root.className = 'bpx-player-ctrl-btn nbs-control-root';
     root.setAttribute('role', 'button');
-    root.setAttribute('aria-label', '视频工具');
     root.innerHTML = `
-      <div class="bpx-player-ctrl-btn-icon nbs-toggle-btn" title="视频工具">
+      <div class="bpx-player-ctrl-btn-icon nbs-toggle-btn">
         <span class="bpx-common-svg-icon">
           <svg viewBox="0 0 1024 1024" aria-hidden="true">
             <path fill="currentColor" d="M894.4 184.32c0-30.72-25.6-56.32-56.32-56.32H185.92C155.2 128 129.6 153.6 129.6 184.32v250.88h76.8V204.8h611.84v414.72H742.4v76.8h95.68c30.72 0 56.32-25.6 56.32-56.32V184.32z"></path>
@@ -953,9 +1154,16 @@
       <div class="nbs-panel">
         <div class="nbs-row">
           <span class="nbs-label">视频缩放</span>
+          <div class="nbs-scale-items">
+            <button class="nbs-scale-btn checked" type="button" data-scale="150">150%</button>
+            <button class="nbs-scale-btn" type="button" data-scale="200">200%</button>
+            <button class="nbs-scale-btn" type="button" data-scale="250">250%</button>
+            <button class="nbs-scale-btn" type="button" data-scale="300">300%</button>
+          </div>
           <div class="nbs-scale-line">
-            <input class="nbs-scale-slider" type="range" min="50" max="250" step="1" value="100">
+            <input class="nbs-scale-slider" type="range" min="50" max="350" step="1" value="100">
             <span class="nbs-scale-value">100%</span>
+            <button class="nbs-reset-icon" title="重置缩放"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
           </div>
         </div>
         <div class="nbs-row">
@@ -967,10 +1175,19 @@
             <button class="nbs-rotate-btn" type="button" data-angle="270">270°</button>
           </div>
           <div class="nbs-rotate-slider-row">
-            <span class="nbs-label" style="font-size:11px">精细旋转</span>
             <input class="nbs-rotate-slider" type="range" min="0" max="359" step="1" value="0">
             <span class="nbs-rotate-degree">0°</span>
+            <button class="nbs-reset-icon" title="重置旋转"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
           </div>
+        </div>
+        <div class="nbs-memory-row">
+          <label>
+            <span>记住视频状态</span>
+            <span class="nbs-memory-toggle">
+              <input type="checkbox" checked>
+              <span class="nbs-memory-slider"></span>
+            </span>
+          </label>
         </div>
         <div class="nbs-tip"></div>
       </div>
@@ -982,10 +1199,24 @@
     refs.panel = root.querySelector('.nbs-panel');
     refs.scaleSlider = root.querySelector('.nbs-scale-slider');
     refs.scaleValue = root.querySelector('.nbs-scale-value');
+    refs.scaleButtons = Array.from(root.querySelectorAll('.nbs-scale-btn'));
+    refs.scaleReset = root.querySelector('.nbs-scale-line .nbs-reset-icon');
     refs.rotateButtons = Array.from(root.querySelectorAll('.nbs-rotate-btn'));
     refs.rotateSlider = root.querySelector('.nbs-rotate-slider');
     refs.rotateDegree = root.querySelector('.nbs-rotate-degree');
+    refs.rotateReset = root.querySelector('.nbs-rotate-slider-row .nbs-reset-icon');
     refs.tipText = root.querySelector('.nbs-tip');
+    refs.memoryToggle = root.querySelector('.nbs-memory-toggle input');
+    if (refs.memoryToggle) {
+      refs.memoryToggle.checked = videoMemoryEnabled;
+      refs.memoryToggle.addEventListener('change', () => {
+        videoMemoryEnabled = refs.memoryToggle.checked;
+        localStorage.setItem('nbs_memoryEnabled', videoMemoryEnabled ? 'true' : 'false');
+        if (!videoMemoryEnabled && currentVideoId) {
+          localStorage.removeItem('nbs_videoState_' + currentVideoId);
+        }
+      });
+    }
 
     refs.toggleBtn.addEventListener('mouseenter', showPanel);
     refs.toggleBtn.addEventListener('mouseleave', scheduleHidePanel);
@@ -1007,6 +1238,27 @@
       const angle = Number(e.target.value);
       setRotation(angle);
     });
+
+    refs.scaleButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const s = Number(btn.dataset.scale);
+        setScale(s);
+      });
+    });
+
+    if (refs.scaleReset) {
+      refs.scaleReset.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetScale();
+      });
+    }
+
+    if (refs.rotateReset) {
+      refs.rotateReset.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetRotation();
+      });
+    }
 
     updateShortcutTip();
     updatePanelPosition();
@@ -1068,6 +1320,7 @@
 
     initObserver();
     sync();
+
   }
 
   if (document.readyState === 'loading') {
