@@ -1,14 +1,18 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
 // @namespace    https://github.com/kqint
-// @version      6.2.0
-// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示
+// @version      6.2.1
+// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，支持直播
 // @author       kqint
 // @license      MIT
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
 // @match        https://www.bilibili.com/video/*
 // @match        https://www.bilibili.com/list/watchlater*
 // @match        https://www.bilibili.com/medialist/play/*
+// @match        https://www.bilibili.com/bangumi/play/*
+// @match        https://www.bilibili.com/list/*
+// @match        https://live.bilibili.com/*
+// @match        https://www.bilibili.com/cheese/play/*
 // @icon         https://www.bilibili.com/favicon.ico
 // @grant        GM_addStyle
 // @grant        GM_setValue
@@ -449,6 +453,39 @@
     .bpx-player-video-wrap.nbs-dragging video {
       pointer-events: none !important;
     }
+
+    /* 直播页面视频包裹层拖拽 */
+    .nbs-live-video-wrap.nbs-dragging {
+      cursor: grabbing !important;
+    }
+    .nbs-live-video-wrap.nbs-dragging video {
+      pointer-events: none !important;
+    }
+
+    /* 直播页面控制按钮定位 - 浮动按钮 */
+    .nbs-control-root.nbs-live-control {
+      position: absolute !important;
+      bottom: 55px !important;
+      right: 116px !important;
+      z-index: 20 !important;
+      width: 38px !important;
+      height: 38px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: rgba(0, 0, 0, 0.55) !important;
+      border-radius: 50% !important;
+      backdrop-filter: blur(4px) !important;
+      color: #fff !important;
+      cursor: pointer !important;
+    }
+    .nbs-control-root.nbs-live-control.nbs-hidden-by-player {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    .nbs-control-root.nbs-live-control .nbs-panel {
+      bottom: 46px !important;
+    }
   `);
 
   const state = {
@@ -507,12 +544,43 @@
     return Math.min(max, Math.max(min, value));
   }
 
+  function isLivePage() {
+    return location.hostname === 'live.bilibili.com';
+  }
+
   function getPlayerContainer() {
+    if (isLivePage()) {
+      return document.querySelector('#live-player');
+    }
     return document.querySelector('.bpx-player-container');
   }
 
   function getVideoWrap() {
+    if (isLivePage()) {
+      return getLiveVideoWrap();
+    }
     return document.querySelector('.bpx-player-video-wrap');
+  }
+
+  function getLiveVideoWrap() {
+    const container = getPlayerContainer();
+    if (!container) return null;
+
+    // 复用已创建的包裹层
+    let wrap = container.querySelector('.nbs-live-video-wrap');
+    if (wrap) return wrap;
+
+    const video = container.querySelector('video');
+    if (!video) return null;
+
+    wrap = document.createElement('div');
+    wrap.className = 'nbs-live-video-wrap';
+    wrap.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;z-index:2';
+
+    video.parentNode.insertBefore(wrap, video);
+    wrap.appendChild(video);
+
+    return wrap;
   }
 
   function getMediaElement() {
@@ -585,6 +653,7 @@
   }
 
   function getControlVisibilityElement() {
+    if (isLivePage()) return null;
     const container = getPlayerContainer();
     if (!container) return null;
     return container.querySelector('.bpx-player-control-bottom')
@@ -676,6 +745,10 @@
     if (!refs.resetButton) return;
     const container = getPlayerContainer();
     if (!container) return;
+    if (isLivePage()) {
+      refs.resetButton.style.bottom = '120px';
+      return;
+    }
     const screenMode = container.dataset.screen || 'normal';
     // 计算还原按钮位置：基于播放器高度的百分比
     const containerHeight = container.clientHeight || 600;
@@ -690,6 +763,10 @@
 
   function updatePanelPosition() {
     if (!refs.panel || !refs.toggleBtn) return;
+    if (isLivePage()) {
+      refs.panel.style.bottom = '46px';
+      return;
+    }
     const container = getPlayerContainer();
     const screenMode = container ? container.dataset.screen : 'normal';
     refs.panel.style.bottom = (screenMode === 'full' || screenMode === 'web') ? '74px' : '41px';
@@ -828,11 +905,6 @@
     }, 180);
   }
 
-  // 键盘缩放已完全删除，函数保留为空
-  function onKeydown(event) {
-    // 无功能
-  }
-
   // 快捷键 + 鼠标滚轮控制缩放
   function onWheel(event) {
     // 检查是否按住配置的快捷键
@@ -920,9 +992,14 @@
 
   // 根据播放器模式更新所有元素的紧凑类
   function updateCompactMode() {
-    const container = getPlayerContainer();
-    const screenMode = container ? container.dataset.screen : 'normal';
-    const isCompact = (screenMode !== 'full' && screenMode !== 'web');
+    let isCompact;
+    if (isLivePage()) {
+      isCompact = !document.fullscreenElement;
+    } else {
+      const container = getPlayerContainer();
+      const screenMode = container ? container.dataset.screen : 'normal';
+      isCompact = (screenMode !== 'full' && screenMode !== 'web');
+    }
     // 控制面板根元素
     if (refs.root) {
       if (isCompact) {
@@ -1134,13 +1211,46 @@
     }
 
     const container = getPlayerContainer();
-    const anchor = container && container.querySelector('.bpx-player-ctrl-btn.bpx-player-ctrl-setting, .bpx-player-ctrl-setting');
-    if (!anchor || !anchor.parentElement) return;
+    if (!container) return;
 
-    const root = document.createElement('div');
-    root.id = 'nbs-control-root';
-    root.className = 'bpx-player-ctrl-btn nbs-control-root';
-    root.setAttribute('role', 'button');
+    let root;
+
+    // 直播页面：追加到播放器容器底部控制栏区域
+    if (isLivePage()) {
+      container.style.position = 'relative';
+      root = document.createElement('div');
+      root.id = 'nbs-control-root';
+      root.className = 'nbs-control-root nbs-live-control';
+      root.setAttribute('role', 'button');
+      container.appendChild(root);
+      // 基于无操作定时器自动隐藏（直播控制栏本身基于无操作隐藏）
+      let activityTimer;
+      const INACTIVITY_DELAY = 3000;
+      const onActivity = () => {
+        root.classList.remove('nbs-hidden-by-player');
+        clearTimeout(activityTimer);
+        activityTimer = setTimeout(() => root.classList.add('nbs-hidden-by-player'), INACTIVITY_DELAY);
+      };
+      container.addEventListener('mousemove', onActivity);
+      container.addEventListener('mouseenter', onActivity);
+      // 悬停在按钮/面板上时保持显示
+      root.addEventListener('mouseenter', () => clearTimeout(activityTimer));
+      root.addEventListener('mouseleave', () => {
+        clearTimeout(activityTimer);
+        activityTimer = setTimeout(() => root.classList.add('nbs-hidden-by-player'), INACTIVITY_DELAY);
+      });
+      // 初始显示后延迟隐藏
+      activityTimer = setTimeout(() => root.classList.add('nbs-hidden-by-player'), INACTIVITY_DELAY);
+    } else {
+      const anchor = container && container.querySelector('.bpx-player-ctrl-btn.bpx-player-ctrl-setting, .bpx-player-ctrl-setting');
+      if (!anchor || !anchor.parentElement) return;
+      root = document.createElement('div');
+      root.id = 'nbs-control-root';
+      root.className = 'bpx-player-ctrl-btn nbs-control-root';
+      root.setAttribute('role', 'button');
+      anchor.insertAdjacentElement('afterend', root);
+    }
+
     root.innerHTML = `
       <div class="bpx-player-ctrl-btn-icon nbs-toggle-btn">
         <span class="bpx-common-svg-icon">
@@ -1193,7 +1303,6 @@
       </div>
     `;
 
-    anchor.insertAdjacentElement('afterend', root);
     refs.root = root;
     refs.toggleBtn = root.querySelector('.nbs-toggle-btn');
     refs.panel = root.querySelector('.nbs-panel');
@@ -1309,7 +1418,6 @@
   }
 
   function init() {
-    document.addEventListener('keydown', onKeydown, true);
     document.addEventListener('mousemove', onMouseMove, true);
     document.addEventListener('mouseup', onMouseUp, true);
     document.addEventListener('click', onCaptureClick, true);
@@ -1317,6 +1425,14 @@
       updatePanelPosition();
       applyTransform();
     });
+
+    // 直播页面全屏切换监听
+    if (isLivePage()) {
+      document.addEventListener('fullscreenchange', () => {
+        updateCompactMode();
+        applyTransform();
+      });
+    }
 
     initObserver();
     sync();
