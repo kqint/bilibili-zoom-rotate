@@ -64,3 +64,7 @@ Bilibili网页端脚本，提供视频缩放、旋转、拖拽移动和视频状
 
 - [**bili-cured-my-neck-pain**](https://github.com/heyManNice/bili-cured-my-neck-pain)  作者：[**heyManNice**](https://github.com/heyManNice)
 - [**B站网页端视频缩放、旋转、拖拽脚本**](https://www.bilibili.com/opus/1078276575030411266) 作者：[**浮云里的浮云**](https://space.bilibili.com/1531643081)
+
+
+> 如果觉得有用，请点亮 ⭐ Star 支持一下～
+[![Star on GitHub](https://img.shields.io/github/stars/kqint/bilibili-zoom-rotate?style=social)](https://github.com/kqint/bilibili-zoom-rotate)
