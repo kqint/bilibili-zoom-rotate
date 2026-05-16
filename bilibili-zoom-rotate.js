@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
 // @namespace    https://github.com/kqint
-// @version      6.2.1
-// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，支持直播
+// @version      6.3.0
+// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，支持直播（按钮嵌入控制栏）
 // @author       kqint
 // @license      MIT
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
@@ -462,28 +462,41 @@
       pointer-events: none !important;
     }
 
-    /* 直播页面控制按钮定位 - 浮动按钮 */
+    /* 直播页面控制按钮 - 嵌入式（与原生控制栏按钮在同一水平线） */
     .nbs-control-root.nbs-live-control {
       position: absolute !important;
-      bottom: 55px !important;
-      right: 116px !important;
-      z-index: 20 !important;
-      width: 38px !important;
-      height: 38px !important;
+      /* 控制栏高度 56px，按钮 36x36，居中放置：(56-36)/2 = 10 */
+      bottom: 10px !important;
+      /* 偏离右侧约 4 个按钮宽度（避开 弹幕设置/小窗/网页全屏/全屏 等原生按钮） */
+      right: 156px !important;
+      z-index: 14 !important;
+      width: 36px !important;
+      height: 36px !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      background: rgba(0, 0, 0, 0.55) !important;
-      border-radius: 50% !important;
-      backdrop-filter: blur(4px) !important;
+      background: transparent !important;
+      border-radius: 4px !important;
       color: #fff !important;
       cursor: pointer !important;
+      opacity: 0.85;
+      transition: opacity 0.18s ease, background-color 0.18s ease;
+    }
+    .nbs-control-root.nbs-live-control:hover {
+      background: rgba(255, 255, 255, 0.15) !important;
+      opacity: 1;
     }
     .nbs-control-root.nbs-live-control.nbs-hidden-by-player {
       opacity: 0 !important;
       pointer-events: none !important;
     }
+    .nbs-control-root.nbs-live-control .nbs-toggle-btn svg {
+      max-width: 22px;
+      max-height: 22px;
+      filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.45));
+    }
     .nbs-control-root.nbs-live-control .nbs-panel {
+      /* 面板与按钮的间距：按钮上沿距离控制栏顶部 (56-10-36)=10px，再加点空隙 */
       bottom: 46px !important;
     }
   `);
@@ -653,9 +666,14 @@
   }
 
   function getControlVisibilityElement() {
-    if (isLivePage()) return null;
     const container = getPlayerContainer();
     if (!container) return null;
+    if (isLivePage()) {
+      // 直播：以控制栏渐变背景的 display 状态作为可见性信号
+      // (.web-player-controller-bg display:none 时表示控制栏隐藏)
+      return container.querySelector('.web-player-controller-bg.web-player-controller-wrap')
+        || container.querySelector('.web-player-controller-bg');
+    }
     return container.querySelector('.bpx-player-control-bottom')
       || container.querySelector('.bpx-player-control-wrap')
       || container.querySelector('.bpx-player-control-entity');
@@ -689,7 +707,18 @@
     if (refs.resetButton) {
       refs.resetButton.classList.toggle('nbs-hidden-by-player', shouldHide && !isResetButtonHovered);
     }
-    
+
+    // 直播页面：嵌入式按钮跟随原生控制栏显隐
+    // 但用户悬停在按钮/面板上时保持显示
+    if (isLivePage() && refs.root) {
+      const isPanelOpen = refs.panel && refs.panel.style.display === 'flex';
+      const isControlHovered = refs.root.dataset.hover === 'true';
+      refs.root.classList.toggle(
+        'nbs-hidden-by-player',
+        shouldHide && !isPanelOpen && !isControlHovered
+      );
+    }
+
     // Toast 强制显示时不隐藏
     if (refs.toast && !refs.toast.classList.contains('nbs-force-show')) {
       refs.toast.classList.toggle('nbs-hidden-by-player', shouldHide);
@@ -1215,7 +1244,7 @@
 
     let root;
 
-    // 直播页面：追加到播放器容器底部控制栏区域
+    // 直播页面：嵌入到播放器容器，按控制栏显隐同步
     if (isLivePage()) {
       container.style.position = 'relative';
       root = document.createElement('div');
@@ -1223,24 +1252,16 @@
       root.className = 'nbs-control-root nbs-live-control';
       root.setAttribute('role', 'button');
       container.appendChild(root);
-      // 基于无操作定时器自动隐藏（直播控制栏本身基于无操作隐藏）
-      let activityTimer;
-      const INACTIVITY_DELAY = 3000;
-      const onActivity = () => {
+
+      // 鼠标悬停时阻止隐藏（即使原生控制栏开始隐藏也保持）
+      root.addEventListener('mouseenter', () => {
+        root.dataset.hover = 'true';
         root.classList.remove('nbs-hidden-by-player');
-        clearTimeout(activityTimer);
-        activityTimer = setTimeout(() => root.classList.add('nbs-hidden-by-player'), INACTIVITY_DELAY);
-      };
-      container.addEventListener('mousemove', onActivity);
-      container.addEventListener('mouseenter', onActivity);
-      // 悬停在按钮/面板上时保持显示
-      root.addEventListener('mouseenter', () => clearTimeout(activityTimer));
-      root.addEventListener('mouseleave', () => {
-        clearTimeout(activityTimer);
-        activityTimer = setTimeout(() => root.classList.add('nbs-hidden-by-player'), INACTIVITY_DELAY);
       });
-      // 初始显示后延迟隐藏
-      activityTimer = setTimeout(() => root.classList.add('nbs-hidden-by-player'), INACTIVITY_DELAY);
+      root.addEventListener('mouseleave', () => {
+        delete root.dataset.hover;
+        scheduleOverlayVisibilitySync();
+      });
     } else {
       const anchor = container && container.querySelector('.bpx-player-ctrl-btn.bpx-player-ctrl-setting, .bpx-player-ctrl-setting');
       if (!anchor || !anchor.parentElement) return;
