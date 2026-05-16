@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
 // @namespace    https://github.com/kqint
-// @version      6.3.0
-// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，支持直播（按钮嵌入控制栏）
+// @version      6.3.1
+// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，支持直播（按钮嵌入控制栏，自动定位到清晰度按钮左侧）
 // @author       kqint
 // @license      MIT
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
@@ -462,16 +462,17 @@
       pointer-events: none !important;
     }
 
-    /* 直播页面控制按钮 - 嵌入式（与原生控制栏按钮在同一水平线） */
+    /* 直播页面控制按钮 - 嵌入式（放到清晰度按钮左侧） */
     .nbs-control-root.nbs-live-control {
       position: absolute !important;
-      /* 控制栏高度 56px，按钮 36x36，居中放置：(56-36)/2 = 10 */
-      bottom: 10px !important;
-      /* 偏离右侧约 4 个按钮宽度（避开 弹幕设置/小窗/网页全屏/全屏 等原生按钮） */
-      right: 156px !important;
+      /* 控制栏高度 56px，按钮 32x32 与原生图标一致；
+         脚本启动时 right 由 JS 根据画质按钮位置动态计算，
+         这里只是初始兜底值，避免在 JS 测量前显示在错误位置 */
+      bottom: 12px !important;
+      right: 320px !important;
       z-index: 14 !important;
-      width: 36px !important;
-      height: 36px !important;
+      width: 32px !important;
+      height: 32px !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
@@ -491,13 +492,12 @@
       pointer-events: none !important;
     }
     .nbs-control-root.nbs-live-control .nbs-toggle-btn svg {
-      max-width: 22px;
-      max-height: 22px;
+      max-width: 20px;
+      max-height: 20px;
       filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.45));
     }
     .nbs-control-root.nbs-live-control .nbs-panel {
-      /* 面板与按钮的间距：按钮上沿距离控制栏顶部 (56-10-36)=10px，再加点空隙 */
-      bottom: 46px !important;
+      bottom: 44px !important;
     }
   `);
 
@@ -717,6 +717,10 @@
         'nbs-hidden-by-player',
         shouldHide && !isPanelOpen && !isControlHovered
       );
+      // 控制栏可见时（或即将可见时）重新测量画质按钮位置
+      if (!shouldHide) {
+        updateLiveButtonPosition();
+      }
     }
 
     // Toast 强制显示时不隐藏
@@ -793,12 +797,84 @@
   function updatePanelPosition() {
     if (!refs.panel || !refs.toggleBtn) return;
     if (isLivePage()) {
-      refs.panel.style.bottom = '46px';
+      refs.panel.style.bottom = '44px';
       return;
     }
     const container = getPlayerContainer();
     const screenMode = container ? container.dataset.screen : 'normal';
     refs.panel.style.bottom = (screenMode === 'full' || screenMode === 'web') ? '74px' : '41px';
+  }
+
+  // 直播页：把按钮动态定位到清晰度按钮（"自动"/"原画"/"蓝光" 等）左侧
+  // 控制栏内部按钮都是 React 哈希类名，无法用 class 锚定，只能靠可见文本
+  const LIVE_QUALITY_KEYWORDS = ['自动', '原画', '蓝光', '4K', '2K', '杜比', '超清', '高清', '流畅', 'HDR'];
+
+  function findLiveQualityAnchor(container) {
+    if (!container) return null;
+    const ctrlWrap = container.querySelector('#web-player-controller-wrap-el')
+      || container.querySelector('.web-player-controller-wrap');
+    if (!ctrlWrap) return null;
+
+    // 在控制栏右半部分查找叶子元素，文本完全等于画质关键词
+    // (不能用 includes, 否则可能命中弹幕输入框等长文本)
+    const ctrlRect = ctrlWrap.getBoundingClientRect();
+    const elements = ctrlWrap.querySelectorAll('div, span, button');
+    let bestMatch = null;
+    for (const el of elements) {
+      // 只看叶子节点，避免命中外层容器
+      if (el.children.length > 0) continue;
+      const text = (el.textContent || '').trim();
+      if (!text || text.length > 6) continue;
+      if (!LIVE_QUALITY_KEYWORDS.includes(text)) continue;
+      const rect = el.getBoundingClientRect();
+      // 必须在控制栏右半部分（画质按钮通常在右侧靠近全屏按钮）
+      if (rect.left < ctrlRect.left + ctrlRect.width * 0.5) continue;
+      if (rect.width === 0 || rect.height === 0) continue;
+      // 选最靠左的（最先出现的画质按钮）
+      if (!bestMatch || rect.left < bestMatch.rect.left) {
+        bestMatch = { el, rect };
+      }
+    }
+    return bestMatch;
+  }
+
+  function updateLiveButtonPosition() {
+    if (!isLivePage() || !refs.root) return;
+    const container = getPlayerContainer();
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    if (!containerRect.width) return;
+
+    const anchor = findLiveQualityAnchor(container);
+    if (!anchor) return;
+
+    // 找到画质按钮所在的可点击外层（向上找一层有 padding/cursor 的容器）
+    let outer = anchor.el;
+    for (let i = 0; i < 4; i++) {
+      const parent = outer.parentElement;
+      if (!parent || parent === container) break;
+      const parentRect = parent.getBoundingClientRect();
+      // 父级比当前节点宽很多才认为是按钮容器（包了 hover 区域）
+      if (parentRect.width > anchor.rect.width + 8) {
+        outer = parent;
+        break;
+      }
+      outer = parent;
+    }
+    const outerRect = outer.getBoundingClientRect();
+
+    // 我们的按钮 32px 宽 + 与画质按钮间距 8px
+    const BUTTON_WIDTH = 32;
+    const GAP = 8;
+    // right = container 右边距 - (画质按钮左边 - GAP - BUTTON_WIDTH)
+    // 即把按钮的右边对齐到 outerRect.left - GAP
+    const rightPx = containerRect.right - outerRect.left + GAP;
+    refs.root.style.right = Math.max(0, Math.round(rightPx)) + 'px';
+
+    // 垂直居中：与画质按钮中线对齐
+    const centerY = outerRect.top + outerRect.height / 2;
+    const bottomPx = containerRect.bottom - centerY - BUTTON_WIDTH / 2;
+    refs.root.style.bottom = Math.max(0, Math.round(bottomPx)) + 'px';
   }
 
   function updateScaleUI() {
@@ -1415,6 +1491,7 @@
 
     updatePanelPosition();
     updateResetButtonPosition();
+    updateLiveButtonPosition();
     applyTransform();
     scheduleOverlayVisibilitySync();
   }
@@ -1444,6 +1521,7 @@
     document.addEventListener('click', onCaptureClick, true);
     window.addEventListener('resize', () => {
       updatePanelPosition();
+      updateLiveButtonPosition();
       applyTransform();
     });
 
@@ -1451,6 +1529,8 @@
     if (isLivePage()) {
       document.addEventListener('fullscreenchange', () => {
         updateCompactMode();
+        // 全屏切换后控制栏会重新布局，延迟测量
+        setTimeout(updateLiveButtonPosition, 200);
         applyTransform();
       });
     }
