@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
 // @namespace    https://github.com/kqint
-// @version      6.2.1
+// @version      6.2.2
 // @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，支持直播
 // @author       kqint
 // @license      MIT
@@ -465,15 +465,15 @@
     /* 直播页面控制按钮定位 - 浮动按钮 */
     .nbs-control-root.nbs-live-control {
       position: absolute !important;
-      bottom: 55px !important;
-      right: 116px !important;
+      bottom: 2px !important;
+      right: 330px !important;
       z-index: 20 !important;
       width: 38px !important;
       height: 38px !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      background: rgba(0, 0, 0, 0.55) !important;
+      background: rgba(0, 0, 0, 0) !important;
       border-radius: 50% !important;
       backdrop-filter: blur(4px) !important;
       color: #fff !important;
