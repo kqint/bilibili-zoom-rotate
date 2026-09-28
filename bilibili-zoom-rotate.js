@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
 // @namespace    https://github.com/kqint
-// @version      6.2.2
-// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，支持直播
+// @version      6.3.0
+// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，可关闭“还原屏幕”按钮，支持直播
 // @author       kqint
 // @license      MIT
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
@@ -298,14 +298,14 @@
       border-radius: 4px;
     }
 
-    /* 视频记忆开关 */
-    .nbs-control-root .nbs-memory-row {
+    /* 开关行（视频记忆 / 还原按钮） */
+    .nbs-control-root .nbs-toggle-row {
       display: flex;
       align-items: center;
       justify-content: flex-start;
       gap: 8px;
     }
-    .nbs-control-root .nbs-memory-row label {
+    .nbs-control-root .nbs-toggle-row label {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -313,26 +313,26 @@
       font-size: 12px;
       color: rgba(255, 255, 255, 0.88);
     }
-    .nbs-control-root .nbs-memory-toggle {
+    .nbs-control-root .nbs-switch {
       position: relative;
       display: inline-block;
       width: 36px;
       height: 20px;
       flex-shrink: 0;
     }
-    .nbs-control-root .nbs-memory-toggle input {
+    .nbs-control-root .nbs-switch input {
       opacity: 0;
       width: 0;
       height: 0;
     }
-    .nbs-control-root .nbs-memory-slider {
+    .nbs-control-root .nbs-switch-slider {
       position: absolute;
       inset: 0;
       background: rgba(255, 255, 255, 0.2);
       border-radius: 20px;
       transition: background 0.2s ease;
     }
-    .nbs-control-root .nbs-memory-slider::before {
+    .nbs-control-root .nbs-switch-slider::before {
       content: '';
       position: absolute;
       width: 16px;
@@ -343,10 +343,10 @@
       border-radius: 50%;
       transition: transform 0.2s ease;
     }
-    .nbs-control-root .nbs-memory-toggle input:checked + .nbs-memory-slider {
+    .nbs-control-root .nbs-switch input:checked + .nbs-switch-slider {
       background: var(--bpx-primary-color, #00A1D6);
     }
-    .nbs-control-root .nbs-memory-toggle input:checked + .nbs-memory-slider::before {
+    .nbs-control-root .nbs-switch input:checked + .nbs-switch-slider::before {
       transform: translateX(16px);
     }
 
@@ -520,6 +520,7 @@
     toast: null,
     tipText: null,
     memoryToggle: null,
+    resetButtonToggle: null,
   };
 
   let videoWrap = null;
@@ -539,6 +540,8 @@
   let currentVideoId = null;
   let saveStateTimer = null;
   let videoMemoryEnabled = localStorage.getItem('nbs_memoryEnabled') !== 'false';
+  // 是否显示播放器中央的“还原屏幕”按钮
+  let resetButtonEnabled = localStorage.getItem('nbs_resetButtonEnabled') !== 'false';
 
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -733,7 +736,10 @@
 
   function updateResetButtonVisibility() {
     if (!refs.resetButton) return;
-    if (isDefaultState()) {
+    // 关闭开关时，即使视频被缩放/旋转/移动也不显示还原按钮
+    if (!resetButtonEnabled) {
+      refs.resetButton.classList.remove('show');
+    } else if (isDefaultState()) {
       refs.resetButton.classList.remove('show');
     } else {
       refs.resetButton.classList.add('show');
@@ -1290,12 +1296,21 @@
             <button class="nbs-reset-icon" title="重置旋转"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
           </div>
         </div>
-        <div class="nbs-memory-row">
+        <div class="nbs-toggle-row">
           <label>
             <span>记住视频状态</span>
-            <span class="nbs-memory-toggle">
-              <input type="checkbox" checked>
-              <span class="nbs-memory-slider"></span>
+            <span class="nbs-switch">
+              <input type="checkbox" class="nbs-memory-toggle" checked>
+              <span class="nbs-switch-slider"></span>
+            </span>
+          </label>
+        </div>
+        <div class="nbs-toggle-row">
+          <label>
+            <span>显示“还原屏幕”按钮</span>
+            <span class="nbs-switch">
+              <input type="checkbox" class="nbs-reset-toggle" checked>
+              <span class="nbs-switch-slider"></span>
             </span>
           </label>
         </div>
@@ -1315,7 +1330,7 @@
     refs.rotateDegree = root.querySelector('.nbs-rotate-degree');
     refs.rotateReset = root.querySelector('.nbs-rotate-slider-row .nbs-reset-icon');
     refs.tipText = root.querySelector('.nbs-tip');
-    refs.memoryToggle = root.querySelector('.nbs-memory-toggle input');
+    refs.memoryToggle = root.querySelector('.nbs-memory-toggle');
     if (refs.memoryToggle) {
       refs.memoryToggle.checked = videoMemoryEnabled;
       refs.memoryToggle.addEventListener('change', () => {
@@ -1324,6 +1339,16 @@
         if (!videoMemoryEnabled && currentVideoId) {
           localStorage.removeItem('nbs_videoState_' + currentVideoId);
         }
+      });
+    }
+    refs.resetButtonToggle = root.querySelector('.nbs-reset-toggle');
+    if (refs.resetButtonToggle) {
+      refs.resetButtonToggle.checked = resetButtonEnabled;
+      refs.resetButtonToggle.addEventListener('change', () => {
+        resetButtonEnabled = refs.resetButtonToggle.checked;
+        localStorage.setItem('nbs_resetButtonEnabled', resetButtonEnabled ? 'true' : 'false');
+        updateResetButtonVisibility();
+        showToast(resetButtonEnabled ? '已显示还原按钮' : '已隐藏还原按钮');
       });
     }
 

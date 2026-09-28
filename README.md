@@ -16,11 +16,11 @@ Bilibili网页端脚本，提供视频缩放、旋转、拖拽移动和视频状
 
 - **拖拽移动**：按住 `Alt键 + 鼠标左键` 可拖拽移动视频位置
 
-- **还原屏幕**：当视频被缩放、旋转或移动时，播放器中央显示还原按钮，一键恢复默认状态
+- **还原屏幕**：当视频被缩放、旋转或移动时，播放器中央显示还原按钮，一键恢复默认状态。若不希望它遮挡画面，可在面板中关闭“显示‘还原屏幕’按钮”
 
 - **视频状态记忆**：自动记住每个视频的缩放/旋转/位置设置（非全局默认配置），再次打开同一视频（包括同一视频的不同分P）时自动恢复状态
 
-  视频状态存储在浏览器 localStorage 中，键名格式为 nbs_videoState_<视频BV号>。你可以在浏览器 DevTools → Application → Local Storage 中查看。开关状态存储在 nbs_memoryEnabled。
+  视频状态存储在浏览器 localStorage 中，键名格式为 nbs_videoState_<视频BV号>。你可以在浏览器 DevTools → Application → Local Storage 中查看。开关状态存储在 nbs_memoryEnabled 和 nbs_resetButtonEnabled。
 
 - **快捷键更改**：可在`shortcutConfig`中更改快捷键
 
