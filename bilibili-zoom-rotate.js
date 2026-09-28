@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         B站视频缩放、旋转
 // @namespace    https://github.com/kqint
-// @version      6.3.0
-// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，视频记忆，缩放Toast提示，可关闭“还原屏幕”按钮，支持直播
+// @version      6.4.0
+// @description  右下角悬停面板控制缩放(50%-350%)/旋转(0-359°)，支持Alt+左键拖拽、Alt+滚轮缩放，快捷缩放/旋转按钮，独立重置，一键重置全部，视频记忆，缩放Toast提示，可关闭“还原屏幕”按钮，支持直播
 // @author       kqint
 // @license      MIT
 // @homepageURL  https://github.com/kqint/bilibili-zoom-rotate
@@ -298,6 +298,34 @@
       border-radius: 4px;
     }
 
+    /* 重置全部按钮 */
+    .nbs-control-root .nbs-reset-all-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      height: 30px;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.16);
+      transition: background-color 0.18s ease, opacity 0.18s ease;
+    }
+    .nbs-control-root .nbs-reset-all-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+    .nbs-control-root .nbs-reset-all-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    .nbs-control-root .nbs-reset-all-btn:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
     /* 开关行（视频记忆 / 还原按钮） */
     .nbs-control-root .nbs-toggle-row {
       display: flex;
@@ -516,6 +544,7 @@
     rotateSlider: null,
     rotateDegree: null,
     rotateReset: null,
+    resetAllButton: null,
     resetButton: null,
     toast: null,
     tipText: null,
@@ -735,11 +764,13 @@
   }
 
   function updateResetButtonVisibility() {
+    // 面板内的“重置全部”按钮：已是默认状态时置灰
+    if (refs.resetAllButton) {
+      refs.resetAllButton.disabled = isDefaultState();
+    }
     if (!refs.resetButton) return;
     // 关闭开关时，即使视频被缩放/旋转/移动也不显示还原按钮
-    if (!resetButtonEnabled) {
-      refs.resetButton.classList.remove('show');
-    } else if (isDefaultState()) {
+    if (!resetButtonEnabled || isDefaultState()) {
       refs.resetButton.classList.remove('show');
     } else {
       refs.resetButton.classList.add('show');
@@ -1296,6 +1327,10 @@
             <button class="nbs-reset-icon" title="重置旋转"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
           </div>
         </div>
+        <button class="nbs-reset-all-btn" type="button" title="恢复缩放、旋转和位置的默认状态" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          <span>重置全部</span>
+        </button>
         <div class="nbs-toggle-row">
           <label>
             <span>记住视频状态</span>
@@ -1330,6 +1365,7 @@
     refs.rotateDegree = root.querySelector('.nbs-rotate-degree');
     refs.rotateReset = root.querySelector('.nbs-rotate-slider-row .nbs-reset-icon');
     refs.tipText = root.querySelector('.nbs-tip');
+    refs.resetAllButton = root.querySelector('.nbs-reset-all-btn');
     refs.memoryToggle = root.querySelector('.nbs-memory-toggle');
     if (refs.memoryToggle) {
       refs.memoryToggle.checked = videoMemoryEnabled;
@@ -1391,6 +1427,14 @@
       refs.rotateReset.addEventListener('click', (e) => {
         e.stopPropagation();
         resetRotation();
+      });
+    }
+
+    if (refs.resetAllButton) {
+      refs.resetAllButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        resetTransform();
       });
     }
 
